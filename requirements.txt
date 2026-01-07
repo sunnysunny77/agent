@@ -1,0 +1,9 @@
+gradio
+ddgs
+torch
+smolagents
+einops 
+transformers
+accelerate
+uvicorn
+fastapi
