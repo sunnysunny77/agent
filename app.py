@@ -8,9 +8,7 @@ from smolagents import (
     FinalAnswerTool,
 )
 from huggingface_hub import InferenceClient
-from PIL import Image
 import io
-import base64
 from fastapi import FastAPI
 
 token = os.getenv("HF_TOKEN")
@@ -139,9 +137,11 @@ iface = gr.Interface(
     description="Search • Sentiment • Image Generation",
 )
 
-# Create the FastAPI instance
 app = FastAPI()
 
-# Mount Gradio into FastAPI
-# "path='/'" is crucial here to prevent redirect loops to /index.html
-app = gr.mount_gradio_app(app, iface, path="/")
+app = gr.mount_gradio_app(app, iface, path="/", theme=gr.themes.Base(),
+css="""
+.column {
+    min-width: 100% !important;
+}
+""")
