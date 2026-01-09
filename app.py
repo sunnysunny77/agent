@@ -14,7 +14,7 @@ from fastapi import FastAPI
 token = os.getenv("HF_TOKEN")
 
 image_client = InferenceClient(
-    model="stabilityai/stable-diffusion-xl-base-1.0",
+    model="stabilityai/stable-diffusion-3-medium",
     token=token
 )
 
@@ -23,20 +23,27 @@ last_generated_image = None
 @tool
 def image_tool(prompt: str) -> str:
     """
-    Generate an image from text.
+    Generate an image from text using SD3-Medium.
     Args:
         prompt (str): image description
     Returns:
         str: A confirmation message.
     """
     global last_generated_image
-    
-    image = image_client.text_to_image(prompt)
+
+    image = image_client.text_to_image(
+        prompt=prompt,
+        negative_prompt="blurry, distorted, low quality",
+        guidance_scale=7.0,
+        num_inference_steps=28,
+        width=1024,
+        height=1024
+    )
 
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
-    last_generated_image = image 
-    
+    last_generated_image = image
+
     return "Image has been generated successfully!"
     
 @tool
@@ -68,7 +75,7 @@ def sentiment_tool(text: str) -> str:
     Returns: str: sentiment
     """
     messages = [
-        {"role": "system", "content": "Analyze the sentiment of the following text"},
+        {"role": "system", "content": "Analyze the sentiment of the following text using a range score of 0 -> 10 and provied alternative wording"},
         {"role": "user", "content": text},
     ]   
     
@@ -112,7 +119,7 @@ agent.prompt_templates["system_prompt"] = agent.prompt_templates["system_prompt"
     - Search the web and return the most relevant results.
     - Used for sentiment analysis
     - image_tool(prompt: str) -> str
-    - Generate an image from text.
+    - Generate an image from text which will be provided to user trough the gloabl last_generated_image and gardio ui.
     - You must construct a well-formatted human-readable answer
     - You must introduce yourself as Jerry and greet the user in the answer
     - You must try include newlines, bullets, numbering, and proper punctuation
@@ -159,6 +166,7 @@ with gr.Blocks() as demo:
         inputs=query_box,
         outputs=[response_box, image_output],
     )
+
 app = FastAPI()
 
 app = gr.mount_gradio_app(app, demo, path="/", theme=gr.themes.Soft())
