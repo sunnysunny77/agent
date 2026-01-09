@@ -126,22 +126,39 @@ def run_agent(query: str):
 
     return agent_text_response, last_generated_image
 
-iface = gr.Interface(
-    fn=run_agent,
-    inputs=gr.Textbox(lines=8),
-    outputs=[
-        gr.Textbox(label="Agent Response", lines=8),
-        gr.Image(label="Generated Image"),
-    ],
-    title="SmolAgent",
-    description="Search • Sentiment • Image Generation",
-)
+with gr.Blocks() as demo:
+    gr.Markdown(
+        """
+        # 🤖 SmolAgent — Jerry
+        **Search • Sentiment • Image Generation**
+        """
+    )
 
+    with gr.Row():
+        with gr.Column(scale=1):
+            query_box = gr.Textbox(
+                lines=8,
+                label="Your Query",
+                placeholder="Ask me to search, analyze sentiment, or generate an image…"
+            )
+
+            run_btn = gr.Button("Run Agent", variant="primary")
+
+        with gr.Column(scale=1):
+            response_box = gr.Textbox(
+                label="Agent Response",
+                lines=10
+            )
+
+            image_output = gr.Image(
+                label="Generated Image"
+            )
+
+    run_btn.click(
+        fn=run_agent,
+        inputs=query_box,
+        outputs=[response_box, image_output],
+    )
 app = FastAPI()
 
-app = gr.mount_gradio_app(app, iface, path="/", theme=gr.themes.Base(),
-css="""
-.column {
-    min-width: 100% !important;
-}
-""")
+app = gr.mount_gradio_app(app, demo, path="/", theme=gr.themes.Soft())
