@@ -1,4 +1,4 @@
-iimport os
+import os
 import gradio as gr
 from smolagents import (
     tool,
