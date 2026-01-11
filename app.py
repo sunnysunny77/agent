@@ -1,4 +1,4 @@
-import os
+iimport os
 import gradio as gr
 from smolagents import (
     tool,
@@ -8,17 +8,67 @@ from smolagents import (
     FinalAnswerTool,
 )
 from huggingface_hub import InferenceClient
-import io
 from fastapi import FastAPI
+import tempfile
+from PIL import Image
+
+def pil_to_tempfile(image):
+   
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    tmp_path = tmp.name
+    tmp.close()
+
+    image.save(tmp_path, format="PNG")
+
+    return tmp_path
 
 token = os.getenv("HF_TOKEN")
 
-image_client = InferenceClient(
-    model="stabilityai/stable-diffusion-3-medium",
-    token=token
+client = InferenceClient(token=token)
+
+nsfw_image_detection_client = InferenceClient(
+    provider="hf-inference",
+    api_key=token
 )
 
-last_generated_image = None
+text_to_image_client = InferenceClient(
+    model="stabilityai/stable-diffusion-3-medium",
+    api_key=token
+)
+
+@tool
+def nsfw_detection_tool(nsfw_detection_input:  Image.Image) -> str:
+    """
+    Suitable for filtering through score explicit or inappropriate content in images.
+    Args:
+        nsfw_detection_input (Image.Image): The image to check.
+    Returns:
+        str: Highest score result.
+    """ 
+    try:
+  
+        tmp_path = pil_to_tempfile(nsfw_detection_input)
+        
+        outputs = client.image_classification(
+            tmp_path,
+            model="Falconsai/nsfw_image_detection"
+        )
+        
+        os.remove(tmp_path)
+
+        top_result = max(outputs, key=lambda x: x.score)
+
+        verdict = (
+            f"Verdict: {top_result.label.upper()}\n"
+            f"Confidence: {top_result.score:.2%}"
+        )
+
+        return verdict
+
+    except Exception as e:
+        return f"NSFW detection failed: {e}"
+
+image_output = None
 
 @tool
 def image_tool(prompt: str) -> str:
@@ -28,24 +78,26 @@ def image_tool(prompt: str) -> str:
         prompt (str): image description
     Returns:
         str: A confirmation message.
-    """
-    global last_generated_image
-
-    image = image_client.text_to_image(
-        prompt=prompt,
-        negative_prompt="blurry, distorted, low quality",
-        guidance_scale=7.0,
-        num_inference_steps=28,
-        width=1024,
-        height=1024
-    )
-
-    buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
-    last_generated_image = image
-
-    return "Image has been generated successfully!"
+    """    
+    global image_output
     
+    try:
+        image = text_to_image_client.text_to_image(
+            prompt=prompt,
+            negative_prompt="blurry, distorted, low quality",
+            guidance_scale=7.0,
+            num_inference_steps=28,
+            width=1024,
+            height=1024
+        )
+        image_output = image
+        return "Image successfully generated and stored for Gradio UI."
+        
+    except Exception as e:
+        image_output = None
+        print(f"Image generation failed: {e}")
+        return f"Image generation failed: {e}"
+   
 @tool
 def search_tool(query: str)-> str:
     """
@@ -58,11 +110,10 @@ def search_tool(query: str)-> str:
         str: The search results.
     """
     web_search_tool = DuckDuckGoSearchTool(max_results=5, rate_limit=2.0)
-    results = web_search_tool(query)
-    return results
-
     
-sentiment_client = InferenceClient(token=token)
+    results = web_search_tool(query)
+    
+    return results
 
 @tool
 def sentiment_tool(text: str) -> str:
@@ -79,7 +130,7 @@ def sentiment_tool(text: str) -> str:
         {"role": "user", "content": text},
     ]   
     
-    completion = sentiment_client.chat.completions.create(
+    completion = client.chat.completions.create(
         model="meta-llama/Llama-3.3-70B-Instruct",
         messages=messages,
         max_tokens=150,
@@ -102,6 +153,7 @@ agent = CodeAgent(
     model=model,
     tools=[
         image_tool,
+        nsfw_detection_tool,
         sentiment_tool,
         search_tool,
         final_answer,
@@ -119,53 +171,42 @@ agent.prompt_templates["system_prompt"] = agent.prompt_templates["system_prompt"
     - Search the web and return the most relevant results.
     - Used for sentiment analysis
     - image_tool(prompt: str) -> str
-    - Generate an image from text which will be provided to user trough the gloabl last_generated_image and gardio ui.
+    - Generate an image from a text prompt, if successfull or not you will be notified by the return string.
+    - nsfw_detection_tool(nsfw_detection_input: Image.Image) -> str
+    - The nsfw_detection_input additional argument is processed entirely within the tool to produce a score from the input.
     - You must construct a well-formatted human-readable answer
     - You must introduce yourself as Jerry and greet the user in the answer
     - You must try include newlines, bullets, numbering, and proper punctuation
     - You must use this answer in final_answer
 """
 
-def run_agent(query: str):
-    global last_generated_image
-    last_generated_image = None
-    agent_text_response = agent.run(query)
+def run_agent(query: str, nsfw_detection_input: Image.Image):
+    global image_output
+    image_output = None
 
-    return agent_text_response, last_generated_image
+    try:
+        response = agent.run(
+            query, 
+            additional_args={"nsfw_detection_input": nsfw_detection_input}
+        )
+        return image_output, str(response)
+    except Exception as e:
+        return None, None, f"Agent Error: {str(e)}"
 
 with gr.Blocks() as demo:
-    gr.Markdown(
-        """
-        # 🤖 SmolAgent — Jerry
-        **Search • Sentiment • Image Generation**
-        """
-    )
+    gr.Markdown("# 🤖 SmolAgent — Jerry\n**Search • Sentiment • Image Generation • Filter and grade an image for inappropriate matial**")
 
     with gr.Row():
         with gr.Column(scale=1):
-            query_box = gr.Textbox(
-                lines=8,
-                label="Your Query",
-                placeholder="Ask me to search, analyze sentiment, or generate an image…"
-            )
-
+            query = gr.Textbox(lines=8, label="Your Query")
+            nsfw_detection_input = gr.Image(label="Upload Image for Filter and grade an image for inappropriate matial", type="pil")
             run_btn = gr.Button("Run Agent", variant="primary")
 
         with gr.Column(scale=1):
-            response_box = gr.Textbox(
-                label="Agent Response",
-                lines=10
-            )
+            image_output = gr.Image(label="Generated Image")
+            agent_response = gr.Textbox(label="Agent Response", lines=10)
 
-            image_output = gr.Image(
-                label="Generated Image"
-            )
-
-    run_btn.click(
-        fn=run_agent,
-        inputs=query_box,
-        outputs=[response_box, image_output],
-    )
+    run_btn.click(fn=run_agent, inputs=[query, nsfw_detection_input], outputs=[image_output, agent_response])
 
 app = FastAPI()
 
