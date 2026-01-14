@@ -102,10 +102,8 @@ def image_tool(prompt: str) -> str:
 def search_tool(query: str)-> str:
     """
     Search the web and return the most relevant results.
-
     Args:
         query (str): The search query.
-
     Returns:
         str: The search results.
     """
@@ -119,7 +117,6 @@ def search_tool(query: str)-> str:
 def sentiment_tool(text: str) -> str:
     """
     Analyze sentiment of given text.
-
     Args:
         text (str): The sentiment query.
     
@@ -162,7 +159,7 @@ agent = CodeAgent(
     planning_interval=None,
 )
 
-agent.prompt_templates["system_prompt"] = agent.prompt_templates["system_prompt"] + """"
+agent.prompt_templates["system_prompt"] += """
     You are a tool calling agent.
     You have access to these tools: 
     - sentiment_tool(text: str) -> str 
@@ -180,33 +177,108 @@ agent.prompt_templates["system_prompt"] = agent.prompt_templates["system_prompt"
     - You must use this answer in final_answer
 """
 
-def run_agent(query: str, nsfw_detection_input: Image.Image):
+def run_agent(query, nsfw_detection_input):
     global image_output
     image_output = None
-
+    
     try:
         response = agent.run(
-            query, 
+            query if query else "", 
             additional_args={"nsfw_detection_input": nsfw_detection_input}
         )
         return image_output, str(response)
     except Exception as e:
-        return None, None, f"Agent Error: {str(e)}"
+        return None, f"Agent Error: {str(e)}"
 
-with gr.Blocks() as demo:
-    gr.Markdown("# 🤖 SmolAgent — Jerry\n**Search • Sentiment • Image Generation • Filter and grade an image for inappropriate matial**")
-
-    with gr.Row():
-        with gr.Column(scale=1):
-            query = gr.Textbox(lines=8, label="Your Query")
-            nsfw_detection_input = gr.Image(label="Upload Image for Filter and grade an image for inappropriate matial", type="pil")
-            run_btn = gr.Button("Run Agent", variant="primary")
-
-        with gr.Column(scale=1):
-            image_output = gr.Image(label="Generated Image")
-            agent_response = gr.Textbox(label="Agent Response", lines=10)
-
-    run_btn.click(fn=run_agent, inputs=[query, nsfw_detection_input], outputs=[image_output, agent_response])
+with gr.Blocks(title="Jerry AI Assistant") as demo:
+    gr.Markdown("# 🤖 Jerry - Your AI Assistant")
+    
+    agent_response = gr.Textbox(
+        label="Response",
+        lines=5,
+        interactive=False
+    )
+    
+    with gr.Tab("💬 Chat"):
+        with gr.Row():
+            query_chat = gr.Textbox(
+                lines=3, 
+                label="Ask me anything...",
+                placeholder="Generate an image of a cat, analyze its sentiment, etc.",
+                scale=4
+            )
+        
+        with gr.Row():
+            run_chat_btn = gr.Button("🚀 Run", variant="primary", scale=1)
+            clear_chat_btn = gr.Button("🗑️ Clear", scale=0)
+        
+        gr.Examples(
+            examples=[
+                "How do i cook a curry quickly",
+                "Analyze the sentiment: This is terrible service",
+            ],
+            inputs=[query_chat],
+            label="💡 Try these:"
+        )
+        
+        # Hidden components for chat tab
+        hidden_image_chat = gr.Image(visible=False)
+        
+        run_chat_btn.click(
+            fn=run_agent, 
+            inputs=[query_chat, hidden_image_chat],
+            outputs=[hidden_image_chat, agent_response]
+        )
+    
+    with gr.Tab("🎨 Image Tools"):
+        with gr.Row():
+            nsfw_detection_input = gr.Image(
+                label="Upload for NSFW check",
+                type="pil",
+                height=300
+            )
+            image_output = gr.Image(
+                label="Generated Image",
+                height=300
+            )
+        
+        with gr.Row():
+            query_img = gr.Textbox(
+                lines=2,
+                label="Image generation prompt",
+                placeholder="A beautiful sunset over mountains..."
+            )
+        
+        with gr.Row():
+            run_img_btn = gr.Button("🎨 Generate Image", variant="primary")
+            check_nsfw_btn = gr.Button("🔍 Check NSFW")
+        
+        gr.Examples(
+            examples=[
+                "A cyberpunk cat with neon glowing eyes",
+                "A serene Japanese garden with cherry blossoms",
+                "A futuristic city with flying cars at sunset",
+                "A magical forest with bioluminescent plants",
+                "A steampunk robot drinking tea in a Victorian parlor"
+            ],
+            inputs=[query_img],
+            label="🎨 Try these prompts:"
+        )
+        
+        hidden_text_img = gr.Textbox(visible=False)
+        hidden_image_img = gr.Image(visible=False)
+        
+        run_img_btn.click(
+            fn=run_agent,
+            inputs=[query_img, hidden_image_img],
+            outputs=[image_output, agent_response]
+        )
+        
+        check_nsfw_btn.click(
+            fn=run_agent,
+            inputs=[hidden_text_img, nsfw_detection_input],
+            outputs=[hidden_image_img, agent_response]
+        )
 
 app = FastAPI()
 
