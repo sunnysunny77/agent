@@ -84,7 +84,7 @@ def image_tool(prompt: str) -> str:
     try:
         image = text_to_image_client.text_to_image(
             prompt=prompt,
-            negative_prompt="blurry, distorted, low quality",
+            negative_prompt="low quality, deformed",
             guidance_scale=7.0,
             num_inference_steps=28,
             width=1024,
@@ -221,7 +221,6 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
             label="💡 Try these:"
         )
         
-        # Hidden components for chat tab
         hidden_image_chat = gr.Image(visible=False)
         
         run_chat_btn.click(
@@ -267,17 +266,17 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
         
         hidden_text_img = gr.Textbox(visible=False)
         hidden_image_img = gr.Image(visible=False)
+
+        check_nsfw_btn.click(
+            fn=run_agent,
+            inputs=[hidden_text_img, nsfw_detection_input],
+            outputs=[hidden_image_img, agent_response]
+        )
         
         run_img_btn.click(
             fn=run_agent,
             inputs=[query_img, hidden_image_img],
             outputs=[image_output, agent_response]
-        )
-        
-        check_nsfw_btn.click(
-            fn=run_agent,
-            inputs=[hidden_text_img, nsfw_detection_input],
-            outputs=[hidden_image_img, agent_response]
         )
 
 app = FastAPI()
