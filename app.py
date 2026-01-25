@@ -87,8 +87,8 @@ def image_tool(prompt: str) -> str:
             negative_prompt="low quality, deformed",
             guidance_scale=7.0,
             num_inference_steps=28,
-            width=1024,
-            height=1024
+            width=992,
+            height=992
         )
         image_output = image
         return "Image successfully generated and stored for Gradio UI."
@@ -113,30 +113,6 @@ def search_tool(query: str)-> str:
     
     return results
 
-@tool
-def sentiment_tool(text: str) -> str:
-    """
-    Analyze sentiment of given text.
-    Args:
-        text (str): The sentiment query.
-    
-    Returns: str: sentiment
-    """
-    messages = [
-        {"role": "system", "content": "Analyze the sentiment of the following text using a range score of 0 -> 10 and provied alternative wording"},
-        {"role": "user", "content": text},
-    ]   
-    
-    completion = client.chat.completions.create(
-        model="meta-llama/Llama-3.3-70B-Instruct",
-        messages=messages,
-        max_tokens=150,
-    )
-
-    result = completion.choices[0].message.content
-
-    return result
-
 final_answer = FinalAnswerTool()
 
 model = InferenceClientModel(
@@ -151,7 +127,6 @@ agent = CodeAgent(
     tools=[
         image_tool,
         nsfw_detection_tool,
-        sentiment_tool,
         search_tool,
         final_answer,
     ],
@@ -162,8 +137,6 @@ agent = CodeAgent(
 agent.prompt_templates["system_prompt"] += """
     You are a tool calling agent.
     You have access to these tools: 
-    - sentiment_tool(text: str) -> str 
-    - Analyze sentiment of given text.
     - search_tool(query: str) -> str
     - Search the web and return the most relevant results.
     - Used for sentiment analysis
@@ -171,6 +144,8 @@ agent.prompt_templates["system_prompt"] += """
     - Generate an image from a text prompt, if successfull or not you will be notified by the return string.
     - nsfw_detection_tool(nsfw_detection_input: Image.Image) -> str
     - The nsfw_detection_input additional argument is processed entirely within the tool to produce a score from the input.
+    - When sentiment analysis is requested, you must analyze the sentiment of prompt text using a range score of 0 -> 10 
+    - and provied alternative wording. 
     - You must construct a well-formatted human-readable answer
     - You must introduce yourself as Jerry and greet the user in the answer
     - You must try include newlines, bullets, numbering, and proper punctuation
@@ -216,6 +191,7 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
             examples=[
                 "How do i cook a curry quickly",
                 "Analyze the sentiment: This is terrible service",
+                "Translate this text to English",
             ],
             inputs=[query_chat],
             label="💡 Try these:"
@@ -249,8 +225,8 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
             )
         
         with gr.Row():
-            run_img_btn = gr.Button("🎨 Generate Image", variant="primary")
             check_nsfw_btn = gr.Button("🔍 Check NSFW")
+            run_img_btn = gr.Button("🎨 Generate Image", variant="primary")
         
         gr.Examples(
             examples=[
@@ -278,7 +254,6 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
             inputs=[query_img, hidden_image_img],
             outputs=[image_output, agent_response]
         )
-
 app = FastAPI()
 
 app = gr.mount_gradio_app(app, demo, path="/", theme=gr.themes.Soft())
