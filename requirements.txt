@@ -5,5 +5,7 @@ smolagents
 einops 
 transformers
 accelerate
-uvicorn
-fastapi
+imageio
+imageio-ffmpeg
+diffusers
+numpy
