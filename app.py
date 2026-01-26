@@ -11,6 +11,16 @@ from huggingface_hub import InferenceClient
 from fastapi import FastAPI
 import tempfile
 from PIL import Image
+import concurrent.futures
+
+def run_with_timeout(func, timeout=300, *args, **kwargs):
+    """Run function with timeout"""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(func, *args, **kwargs)
+        try:
+            return future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            raise TimeoutError(f"Tool timed out after {timeout} seconds")
 
 def pil_to_tempfile(image):
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
@@ -61,38 +71,55 @@ def aligned_num_frames(duration, fps=16):
 image_output = None    
 video_output = None    
 
+video_prompt = ""
+video_duration = 4
+video_steps = 20
+video_guidance = 3.0
+video_randomize = True
+
 @tool
-def video_tool(video_image_input: Image.Image) -> str:
+def video_tool(
+    video_image_input: Image.Image, 
+    prompt: str = "high quality, detailed, sharp, cinematic", 
+    duration: float = 4, 
+    steps: int = 20, 
+    guidance: float = 3.0
+) -> str:
     """
     Generates a video from a starting image using Wan 2.1.
     Args:
         video_image_input (Image.Image): The source image to be animated.
+        prompt (str): The prompt for video generation.
+        duration (float): Duration in seconds.
+        steps (int): Number of inference steps.
+        guidance (float): Guidance scale.
     Returns:
         str: A confirmation message.
     """
     global video_output
     
     try:
-
         FPS = 12  
-        num_frames = aligned_num_frames(1.5, FPS) 
+        num_frames = aligned_num_frames(duration, FPS) 
         
-        video_bytes = video_client.image_to_video(
-            image=video_image_input.resize((832, 480)),
-            prompt="high quality, detailed, sharp, cinematic",
-            negative_prompt="low quality, deformed, grainy, blurry, pixelated",
-            num_frames=num_frames,
-            num_inference_steps=20,  
-            guidance_scale=3, 
-            decode_chunk_size=8, 
-        )
+        def generate_video():
+            return video_client.image_to_video(
+                image=video_image_input.resize((832, 480)),
+                prompt=prompt,
+                negative_prompt="low quality, deformed, grainy, blurry, pixelated",
+                num_frames=num_frames,
+                num_inference_steps=steps,  
+                guidance_scale=guidance, 
+                decode_chunk_size=8, 
+            )
+        
+        video_bytes = run_with_timeout(generate_video, timeout=300)
         
         out = tempfile.mktemp(suffix=".mp4")
         with open(out, "wb") as f:
             f.write(video_bytes)
         
         video_output = out
-        
         return "Video successfully generated and stored for Gradio UI."
         
     except Exception as e:
@@ -141,21 +168,24 @@ def image_tool(prompt: str) -> str:
     global image_output  
     
     try:
-        image = text_to_image_client.text_to_image(
-            prompt=prompt,
-            negative_prompt="low quality, deformed",
-            guidance_scale=7.0,
-            num_inference_steps=28,
-            width=992,
-            height=992
-        )
-        image_output = image
+        def generate_image():
+            return text_to_image_client.text_to_image(
+                prompt=prompt,
+                negative_prompt="low quality, deformed",
+                guidance_scale=7.0,
+                num_inference_steps=28,
+                width=992,
+                height=992
+            )
         
+        image = run_with_timeout(generate_image, timeout=300)
+        image_output = image
         return "Image successfully generated and stored for Gradio UI."
         
     except Exception as e:
         image_output = None
         return f"Image generation failed: {e}"
+
 
 @tool
 def search_tool(query: str) -> str:
@@ -202,8 +232,8 @@ agent.prompt_templates["system_prompt"] += """
     - search_tool(query: str) -> str
     - Search the web and return the most relevant results.
     - Used for sentiment analysis
-    - video_tool(video_image_input: Image.Image) -> str
-    - Generate a video from an image input, if successfull or not you will be notified by the return string.    
+    - video_tool(video_image_input: Image.Image, prompt: str, duration: float, steps: int, guidance: float) -> str
+    - Generate a video from an image input with custom parameters, if successfull or not you will be notified by the return string.    
     - image_tool(prompt: str) -> str
     - Generate an image from a text prompt, if successfull or not you will be notified by the return string.
     - nsfw_detection_tool(nsfw_detection_input: Image.Image) -> str
@@ -217,7 +247,16 @@ agent.prompt_templates["system_prompt"] += """
     - You must use this answer in final_answer
 """
 
-def run_agent(query, nsfw_detection_input, video_image_input):
+def run_agent(
+    query, 
+    nsfw_detection_input, 
+    video_image_input, 
+    video_prompt_param="", 
+    video_duration_param=4.0, 
+    video_steps_param=20, 
+    video_guidance_param=3.0, 
+    video_randomize_param=True
+):
     global image_output, video_output
     image_output = None
     video_output = None
@@ -231,7 +270,7 @@ def run_agent(query, nsfw_detection_input, video_image_input):
         if query and query.strip():
             actual_query = query
         elif video_image_input is not None:
-            actual_query = "Generate a video from this image"
+            actual_query = f"Generate a video from this image with prompt: '{video_prompt_param}', duration: {video_duration_param}s, steps: {video_steps_param}, guidance: {video_guidance_param}"
         elif nsfw_detection_input is not None:
             actual_query = "Check this image for NSFW content"
         else:
@@ -241,7 +280,11 @@ def run_agent(query, nsfw_detection_input, video_image_input):
             actual_query,
             additional_args={
                 "nsfw_detection_input": nsfw_detection_input, 
-                "video_image_input": video_image_input, 
+                "video_image_input": video_image_input,
+                "prompt": video_prompt_param,
+                "duration": video_duration_param,
+                "steps": video_steps_param,
+                "guidance": video_guidance_param,
             }
         )
 
@@ -285,6 +328,11 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
                 query_chat,
                 gr.Image(visible=False),
                 gr.Image(visible=False),
+                gr.Textbox(visible=False),
+                gr.Number(visible=False),
+                gr.Number(visible=False),
+                gr.Number(visible=False),
+                gr.Checkbox(visible=False),
             ],
             outputs=[gr.Image(visible=False), gr.Video(visible=False), agent_response]
         )
@@ -293,18 +341,48 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
         with gr.Row():
             with gr.Column():
                 video_image_input = gr.Image(type="pil", label="Input Image")
-                gr.Markdown("Upload the starting image for the video.")            
-                gen_btn = gr.Button("🎬 Generate Video", variant="primary")
+                gr.Markdown("Upload the starting image for the video. This will be animated according to your prompt.")
+    
+                prompt_txt = gr.Textbox(lines=3, label="Prompt", placeholder="Video diffusion may take awhile..")
+                gr.Markdown("Describe what you want in the video. Be as detailed as needed.")
+    
+                with gr.Accordion("Settings", open=True):
+                    dur_slider = gr.Slider(1, 4, value=4, step=0.1, label="Duration (seconds)")
+                    gr.Markdown("Controls the length of the video. Longer durations generate more frames and require more compute.")
+                    
+                    step_slider = gr.Slider(4, 20, value=20, step=1, label="Steps (quality)")
+                    gr.Markdown("Number of diffusion steps used per frame. Higher values improve detail and temporal stability but increase generation time.")
+                    
+                    guidance_slider = gr.Slider(1.0, 6.0, value=3.0, step=0.1, label="Guidance Strength")
+                    gr.Markdown("How strongly the model follows the prompt. Lower values are more natural and fluid, higher values are more literal and stylized.")
+    
+                    rand_check = gr.Checkbox(value=True, label="Randomize Seed")
+                    gr.Markdown("Toggle this to get a fresh variation every run. Turn it off to reuse the same motion and style.")
+    
+                gen_btn = gr.Button("Generate Video", variant="primary")
 
             with gr.Column():
                 output_vid = gr.Video(label="Generated Video")
+
+        gr.Examples(
+            examples=[
+                "The people all raise a glass and cheer",
+            ],
+            inputs=[prompt_txt],
+            label="💡 Try these:"
+        )
         
         gen_btn.click(
             fn=run_agent,
             inputs=[
-                gr.Textbox(visible=False),
-                gr.Image(visible=False),
-                video_image_input,
+                gr.Textbox(visible=False), 
+                gr.Image(visible=False),    
+                video_image_input,            
+                prompt_txt,                 
+                dur_slider,                  
+                step_slider,              
+                guidance_slider,               
+                rand_check,                    
             ],
             outputs=[gr.Image(visible=False), output_vid, agent_response]
         )
@@ -335,9 +413,14 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
         check_nsfw_btn.click(
             fn=run_agent,
             inputs=[
-                gr.Textbox(visible=False),
-                nsfw_detection_input,
-                gr.Image(visible=False),
+                gr.Textbox(visible=False),  
+                nsfw_detection_input,         
+                gr.Image(visible=False),    
+                gr.Textbox(visible=False),  
+                gr.Number(visible=False),    
+                gr.Number(visible=False),    
+                gr.Number(visible=False),    
+                gr.Checkbox(visible=False), 
             ],
             outputs=[gr.Image(visible=False), gr.Video(visible=False), agent_response]
         )
@@ -345,9 +428,14 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
         run_img_btn.click(
             fn=run_agent,
             inputs=[
-                query_img,
-                gr.Image(visible=False),
-                gr.Image(visible=False),
+                query_img,                    
+                gr.Image(visible=False),      
+                gr.Image(visible=False),      
+                gr.Textbox(visible=False),   
+                gr.Number(visible=False),     
+                gr.Number(visible=False),     
+                gr.Number(visible=False),      
+                gr.Checkbox(visible=False),   
             ],
             outputs=[image_output_display, gr.Video(visible=False), agent_response]
         )
