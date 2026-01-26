@@ -449,7 +449,6 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
             concurrency_limit=5
         )
 
-
 app = FastAPI()
 
 demo.queue() 
