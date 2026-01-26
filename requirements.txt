@@ -1,11 +1,7 @@
 gradio
-ddgs
-torch
 smolagents
-einops 
-transformers
-accelerate
-imageio
-imageio-ffmpeg
-diffusers
-numpy
+duckduckgo-search
+pillow
+huggingface-hub
+uvicorn
+fastapi

@@ -342,7 +342,8 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
                 gr.Number(visible=False),
                 gr.Number(visible=False),
             ],
-            outputs=[gr.Image(visible=False), gr.Video(visible=False), agent_response]
+            outputs=[gr.Image(visible=False), gr.Video(visible=False), agent_response],
+            concurrency_limit=5
         )
 
     with gr.Tab("🎬 Video Tools"):
@@ -389,7 +390,8 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
                 step_slider,              
                 guidance_slider,                                
             ],
-            outputs=[gr.Image(visible=False), output_vid, agent_response]
+            outputs=[gr.Image(visible=False), output_vid, agent_response],
+            concurrency_limit=5
         )
 
     with gr.Tab("🎨 Image Tools"):
@@ -427,7 +429,8 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
                 gr.Number(visible=False),    
                 gr.Number(visible=False),    
             ],
-            outputs=[gr.Image(visible=False), gr.Video(visible=False), agent_response]
+            outputs=[gr.Image(visible=False), gr.Video(visible=False), agent_response],
+            concurrency_limit=5
         )
 
         run_img_btn.click(
@@ -442,10 +445,13 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
                 gr.Number(visible=False),     
                 gr.Number(visible=False),      
             ],
-            outputs=[image_output_display, gr.Video(visible=False), agent_response]
+            outputs=[image_output_display, gr.Video(visible=False), agent_response],
+            concurrency_limit=5
         )
 
 
 app = FastAPI()
+
+demo.queue() 
 
 app = gr.mount_gradio_app(app, demo, path="/", theme=gr.themes.Soft())
