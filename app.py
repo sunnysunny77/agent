@@ -88,10 +88,10 @@ def video_tool(
     global video_output
     
     try:
-        w, h = image.size
+        w, h = video_image_input.size
         w_aligned = align(w)
         h_aligned = align(h)    
-        image = image.resize((w_aligned, h_aligned))
+        image = video_image_input.resize((w_aligned, h_aligned))
         
         FPS = 16 
         num_frames = aligned_num_frames(duration, FPS)
