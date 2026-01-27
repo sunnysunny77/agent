@@ -220,6 +220,7 @@ agent = CodeAgent(
     ],
     max_steps=6,
     planning_interval=None,
+    verbosity_level=1,
 )
 
 agent.prompt_templates["system_prompt"] += """
@@ -229,9 +230,11 @@ agent.prompt_templates["system_prompt"] += """
     - Search the web and return the most relevant results.
     - Used for sentiment analysis
     - video_tool(video_image_input: Image.Image, prompt: str, duration: float, steps: int, guidance: float) -> str
-    - Generate a video from an image input with custom parameters, if successfull or not you will be notified by the return string.    
+    - Generate a video from an image input with custom parameters, if successfull or not you will be notified by the return string
+    - the video_tool has a timeout of 300 so please be patient.
     - image_tool(image_prompt_param: str) -> str
-    - Generate an image from a text prompt, if successfull or not you will be notified by the return string.
+    - Generate an image from a text prompt, if successfull or not you will be notified by the return string
+    - the image_tool has a timeout of 300 so please be patient.
     - nsfw_detection_tool(nsfw_detection_input: Image.Image) -> str
     - The nsfw_detection_input additional argument is processed entirely within the tool to produce a score from the input.
     - When sentiment analysis is requested, you must analyze the sentiment of prompt text using a range score of 0 -> 10 
@@ -448,7 +451,7 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
             outputs=[image_output_display, gr.Video(visible=False), agent_response],
             concurrency_limit=5
         )
-
+        
 app = FastAPI()
 
 demo.queue() 
