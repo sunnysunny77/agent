@@ -29,21 +29,6 @@ def pil_to_tempfile(image):
     image.save(tmp_path, format="PNG")
     return tmp_path
 
-def resize_and_crop(image, target_res=(832, 480)):
-    tw, th = target_res
-    iw, ih = image.size
-    scale = max(tw / iw, th / ih)
-    nw, nh = int(iw * scale), int(ih * scale)
-    image = image.resize((nw, nh), Image.LANCZOS)
-    left = (nw - tw) // 2
-    if ih > iw:
-        top = int((nh - th) * 0.25)
-    else:
-        top = (nh - th) // 2
-    right = left + tw
-    bottom = top + th
-    return image.crop((left, top, right, bottom))
-
 def aligned_num_frames(duration, fps=16):
     n = int(duration * fps)
     return ((n - 1) // 4) * 4 + 1
@@ -230,11 +215,19 @@ agent.prompt_templates["system_prompt"] += """
     - Search the web and return the most relevant results.
     - Used for sentiment analysis
     - video_tool(video_image_input: Image.Image, prompt: str, duration: float, steps: int, guidance: float) -> str
-    - Generate a video from an image input with custom parameters, if successfull or not you will be notified by the return string
-    - the video_tool has a timeout of 300 so you must be patient it is running in the background and may take longer thgan 30 seconds.
+    - Generate a video from an image input with custom parameters, 
+    - if successfull or not you will be notified by the return string,
+    - you do not need to save the video, 
+    - it will be passed to gradio via the global from within the tool,
+    - the video_tool has a timeout of 300 so you must be patient,
+    - it is running in the background and may take longer thgan 30 seconds.
     - image_tool(image_prompt_param: str) -> str
-    - Generate an image from a text prompt, if successfull or not you will be notified by the return string
-    - the image_tool has a timeout of 300 so you must be patient it is running in the background and may take longer thgan 30 seconds.
+    - Generate an image from a text prompt,
+    - if successfull or not you will be notified by the return string,
+    - you do not need to save the image, 
+    - it will be passed to gradio via the global from within the tool,
+    - the image_tool has a timeout of 300 so you must be patient,
+    - it is running in the background and may take longer thgan 30 seconds.
     - nsfw_detection_tool(nsfw_detection_input: Image.Image) -> str
     - The nsfw_detection_input additional argument is processed entirely within the tool to produce a score from the input.
     - When sentiment analysis is requested, you must analyze the sentiment of prompt text using a range score of 0 -> 10 
