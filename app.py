@@ -33,6 +33,9 @@ def aligned_num_frames(duration, fps=16):
     n = int(duration * fps)
     return ((n - 1) // 4) * 4 + 1
 
+def align(x, base=16):
+    return (x // base) * base
+
 token = os.getenv("HF_TOKEN")
 if not token:
     raise RuntimeError("Please set HF_TOKEN environment variable")
@@ -85,11 +88,19 @@ def video_tool(
     global video_output
     
     try:
-        FPS = 12  
-        num_frames = aligned_num_frames(duration, FPS)        
+        w, h = image.size
+        w_aligned = align(w)
+        h_aligned = align(h)    
+        image = image.resize((w_aligned, h_aligned))
+        
+        FPS = 16 
+        num_frames = aligned_num_frames(duration, FPS)
+        
         def generate_video():
             return video_client.image_to_video(
-                image=video_image_input.resize((832, 480)),
+                image=image, 
+                width=w_aligned,
+                height=h_aligned,
                 prompt=prompt,
                 negative_prompt="low quality, deformed, grainy, blurry, pixelated",
                 num_frames=num_frames,
@@ -351,7 +362,7 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
                 gr.Markdown("Describe what you want in the video. Be as detailed as needed.")
     
                 with gr.Accordion("Settings", open=True):
-                    dur_slider = gr.Slider(1, 4, value=4, step=0.1, label="Duration (seconds)")
+                    dur_slider = gr.Slider(1, 3, value=3, step=0.1, label="Duration (seconds)")
                     gr.Markdown("Controls the length of the video. Longer durations generate more frames and require more compute.")
                     
                     step_slider = gr.Slider(4, 20, value=20, step=1, label="Steps (quality)")
@@ -443,6 +454,7 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
             outputs=[image_output_display, gr.Video(visible=False), agent_response],
             concurrency_limit=5
         )
+        
         
 app = FastAPI()
 
