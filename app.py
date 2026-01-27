@@ -220,7 +220,7 @@ agent = CodeAgent(
     ],
     max_steps=6,
     planning_interval=None,
-    verbosity_level=1,
+    verbosity_level=2,
 )
 
 agent.prompt_templates["system_prompt"] += """
@@ -231,10 +231,10 @@ agent.prompt_templates["system_prompt"] += """
     - Used for sentiment analysis
     - video_tool(video_image_input: Image.Image, prompt: str, duration: float, steps: int, guidance: float) -> str
     - Generate a video from an image input with custom parameters, if successfull or not you will be notified by the return string
-    - the video_tool has a timeout of 300 so please be patient.
+    - the video_tool has a timeout of 300 so you must be patient it is running in the background and may take longer thgan 30 seconds.
     - image_tool(image_prompt_param: str) -> str
     - Generate an image from a text prompt, if successfull or not you will be notified by the return string
-    - the image_tool has a timeout of 300 so please be patient.
+    - the image_tool has a timeout of 300 so you must be patient it is running in the background and may take longer thgan 30 seconds.
     - nsfw_detection_tool(nsfw_detection_input: Image.Image) -> str
     - The nsfw_detection_input additional argument is processed entirely within the tool to produce a score from the input.
     - When sentiment analysis is requested, you must analyze the sentiment of prompt text using a range score of 0 -> 10 
@@ -293,7 +293,6 @@ def run_agent(
                 "duration": video_duration_param,
                 "steps": video_steps_param,
                 "guidance": video_guidance_param,
-                "progress": progress,
             }
         )
 
