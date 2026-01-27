@@ -88,19 +88,23 @@ def video_tool(
     global video_output
     
     try:
+        MAX_RES = 1024 
         w, h = video_image_input.size
-        w_aligned = align(w)
-        h_aligned = align(h)    
-        image = video_image_input.resize((w_aligned, h_aligned))
         
+        scale = min(MAX_RES / w, MAX_RES / h, 1)
+        new_w = align(int(w * scale))
+        new_h = align(int(h * scale))
+        
+        image = video_image_input.resize((new_w, new_h), Image.LANCZOS)
+
         FPS = 16 
         num_frames = aligned_num_frames(duration, FPS)
         
         def generate_video():
             return video_client.image_to_video(
                 image=image, 
-                width=w_aligned,
-                height=h_aligned,
+                width=new_w,
+                height=new_h,
                 prompt=prompt,
                 negative_prompt="low quality, deformed, grainy, blurry, pixelated",
                 num_frames=num_frames,
@@ -454,8 +458,7 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
             outputs=[image_output_display, gr.Video(visible=False), agent_response],
             concurrency_limit=5
         )
-        
-        
+          
 app = FastAPI()
 
 demo.queue() 
