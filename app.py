@@ -88,7 +88,7 @@ def video_tool(
     global video_output
     
     try:
-        MAX_RES = 1024 
+        MAX_RES = 832 
         w, h = video_image_input.size
         
         scale = min(MAX_RES / w, MAX_RES / h, 1)
@@ -232,15 +232,15 @@ agent.prompt_templates["system_prompt"] += """
     - video_tool(video_image_input: Image.Image, prompt: str, duration: float, steps: int, guidance: float) -> str
     - Generate a video from an image input with custom parameters, 
     - if successfull or not you will be notified by the return string,
-    - you do not need to save the video, 
-    - it will be passed to gradio via the global from within the tool,
+    - you do not need to save the video or print the result, 
+    - it will be passed to the gradio ui automatically via the global variable from within the tool,
     - the video_tool has a timeout of 300 so you must be patient,
     - it is running in the background and may take longer thgan 30 seconds.
     - image_tool(image_prompt_param: str) -> str
     - Generate an image from a text prompt,
     - if successfull or not you will be notified by the return string,
-    - you do not need to save the image, 
-    - it will be passed to gradio via the global from within the tool,
+    - you do not need to save the image or print the result, 
+    - it will be passed to the gradio ui automatically via the global variable from within the tool,
     - the image_tool has a timeout of 300 so you must be patient,
     - it is running in the background and may take longer thgan 30 seconds.
     - nsfw_detection_tool(nsfw_detection_input: Image.Image) -> str

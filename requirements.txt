@@ -5,3 +5,5 @@ pillow
 huggingface-hub
 uvicorn
 fastapi
+ddgs
+pytz
