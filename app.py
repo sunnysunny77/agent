@@ -88,7 +88,7 @@ def video_tool(
     global video_output
     
     try:
-        MAX_RES = 832 
+        MAX_RES = 640 
         w, h = video_image_input.size
         
         scale = min(MAX_RES / w, MAX_RES / h, 1)
@@ -366,10 +366,10 @@ with gr.Blocks(title="Jerry AI Assistant") as demo:
                 gr.Markdown("Describe what you want in the video. Be as detailed as needed.")
     
                 with gr.Accordion("Settings", open=True):
-                    dur_slider = gr.Slider(1, 3, value=3, step=0.1, label="Duration (seconds)")
+                    dur_slider = gr.Slider(1, 5, value=3, step=0.1, label="Duration (seconds)")
                     gr.Markdown("Controls the length of the video. Longer durations generate more frames and require more compute.")
                     
-                    step_slider = gr.Slider(4, 20, value=20, step=1, label="Steps (quality)")
+                    step_slider = gr.Slider(4, 35, value=20, step=1, label="Steps (quality)")
                     gr.Markdown("Number of diffusion steps used per frame. Higher values improve detail and temporal stability but increase generation time.")
                     
                     guidance_slider = gr.Slider(1.0, 6.0, value=3.0, step=0.1, label="Guidance Strength")
